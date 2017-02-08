@@ -4,7 +4,7 @@
 (require 2htdp/image)
 (require 2htdp/universe)
 
-;; Simulation of A Turing Machine
+;; Turing Machine Simulator
 
 ;; CONSTANTS
 
@@ -125,7 +125,7 @@
 (define-struct instruction (action next-qnum))
 ;; Instruction is one-of:
 ;; - "HALT"
-;; - (make-instruction Action QNum)
+;; - (make-instruction Action Natural)
 ;; when this instruction is triggered, do Action and go to the state qn
 
 (define HALT "HALT")
@@ -203,51 +203,35 @@
 
 ;; -------------------------------------------
 
-;; QNum is Natural
-;; interp. Index of current state:
-;; - By convention, 0 will be halting state, 1 will be initial state.
-
-(define N0 0)
-(define N1 1)
-(define N3 3)
-
-#;
-(define (fn-for-qnum n)
-  (... n))
-;; Template rules:
-;; - atomic non-distinct: Natural
-
-;; -------------------------------------------
-
-(define-struct config (tape qnum tm))
-;; Config is (make-config Tape Natural Machine)
+(define-struct config (tape tm qnum))
+;; Config is (make-config Tape Machine Natural)
 ;; interp. the current configuration of the machine:
 ;; tape is the state of the tape
-;; qnum is the index of the current state [0->halting, 1->initial]
-(define C1 (make-config T1 1 TM1)) 
+;; qnum is the index of the current state {0->halting, 1->initial}
+(define C1 (make-config T1 TM1 1))
 (define C-ONE-THIRD (make-config T0
-                                 1
                                  (list Q0
                                        (make-qstate ;q1
                                         (make-instruction R 2)
                                         HALT)
                                        (make-qstate ;q2
                                         (make-instruction S1 2)
-                                        (make-instruction R 1)))))
-(define C:4+5 (make-config T4B5 1 TM:X+Y))
-(define C:EX.4:1 (make-config T1 1 TM:EX.4))
+                                        (make-instruction R 1)))
+                                 1))
+(define C:4+5 (make-config T4B5 TM:X+Y 1))
+(define C:EX.4:1 (make-config T1 TM:EX.4 1))
 
 #;
 (define (fn-for-config cf)
   (fn-for-tape (config-tape cf))
-  (fn-for-qnum (config-qnum cf))
-  (fn-for-tm (config-tm cf)))
+  (fn-for-tm (config-tm cf))
+  (config-qnum cf))
 
 ;; Template rules:
 ;; -compound: 3 fields
 ;; -Reference: (config-tape t) isTape
-;; -Reference: (config-qnum t) is qnum
 ;; -Reference: (config-tm t) is Machine
+;; -atomic non-distinct: Natural
 
 
 ;; Functions:
@@ -272,15 +256,15 @@
 
 (check-expect (tock C1)
               (make-config (make-tape (list S1) S0 empty)
-                           1
-                           (config-tm C1)))
+                           (config-tm C1)
+                           1))
 
 (define (tock cf)
   (if (equal? (config-instruction cf) HALT)
       cf
       (make-config (perform-action (config-action cf) (config-tape cf))
-                   (config-next-qnum cf)
-                   (config-tm cf))))
+                   (config-tm cf)
+                   (config-next-qnum cf))))
 
 ;; -----------------------------------------
 
@@ -341,7 +325,12 @@
 ;; Config -> QState
 ;; Get the current QState from cf
 
-(define (config-qn cf)
+(check-expect (config-qstate (make-config T0 (list Q0 Q0 Q1) 2))
+              Q1)
+(check-expect (config-qstate (make-config T1 (list Q1 Q0) 1))
+              Q0)
+
+(define (config-qstate cf)
   (list-ref (config-tm cf) (config-qnum cf)))
 
 ;; -----------------------------------------
@@ -366,8 +355,8 @@
 
 (define (config-instruction cf)
   (if (string=? (config-head cf) S0)
-                          (qstate-if0 (config-qn cf))
-                          (qstate-if1 (config-qn cf))))
+                          (qstate-if0 (config-qstate cf))
+                          (qstate-if1 (config-qstate cf))))
 
 ;; -----------------------------------------
 
@@ -379,7 +368,7 @@
 
 ;; -----------------------------------------
 
-;; Config -> QNum
+;; Config -> Natural
 ;; Get the next qnum from c
 
 (define (config-next-qnum cf)
